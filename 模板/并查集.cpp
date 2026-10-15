@@ -1,9 +1,14 @@
 #include<bits/stdc++.h>
 
-std::vector<int> sets(1000000);
-int find(int x) {
+std::map<long long, long long> sets;
+long long find(long long x) {
+    if (sets.find(x) == sets.end()) sets[x] = x;
     if (sets[x] == x) return x;
-    else return sets[x] = find(sets[x]);
+    return sets[x] = find(sets[x]);
+}
+
+void merge(long long x, long long y) {
+    sets[find(x)] = find(y);
 }
 
 int main() {

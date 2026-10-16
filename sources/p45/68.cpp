@@ -24,12 +24,12 @@ int main() {
         pq.pop();
         if (distance != dist[u][used]) continue;
         for (auto [v, w] : edges[u]) {
-            if (dist[v][used] > distance + w) {
-                dist[v][used] = distance + w;
+            if (dist[v][used] > distance + w) { //  一般性的有更便宜方法
+                dist[v][used] = distance + w;   //  没用所以要加钱
                 pq.push({dist[v][used], v, used});
             }
-            if (used < k && dist[v][used + 1] > distance) {
-                dist[v][used + 1] = distance;
+            if (used < k && dist[v][used + 1] > distance) { //  使用票的时候的更便宜方法
+                dist[v][used + 1] = distance;   //  用了一张所以不加钱
                 pq.push({dist[v][used + 1], v, used + 1});
             }
         }

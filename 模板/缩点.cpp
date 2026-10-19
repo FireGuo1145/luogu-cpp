@@ -1,0 +1,36 @@
+#include<bits/stdc++.h>
+
+std::vector<int> dfn, low, instack, id; // dfn: 时间 low: 能到达的最早的时间 instack: 是不是在栈里面 id: 属于哪个分量
+std::vector<std::vector<int>> g, dag;   // g: 原图 dag: 缩点后的图
+std::stack<int> s;  // 栈
+int n, m, cnt, scc;    // n: 点数 m: 边数 cnt: 时间 top: 栈顶 scc: 分量数
+
+void tarjan(int u) {    // u: 当前点
+    dfn[u] = low[u] = ++cnt;    // 时间
+    s.push(u);
+    instack[u] = true;
+    for (int v : g[u]) {
+        if (!dfn[v]) {
+            tarjan(v);
+            low[u] = std::min(low[u], low[v]);
+        } else if (instack[v]) {
+            low[u] = std::min(low[u], dfn[v]);
+        }
+    }
+    if (low[u] == dfn[u]) {
+        int v;
+        ++scc;
+        while (true) {
+            v = s.top();
+            s.pop();
+            instack[v] = false;
+            id[v] = scc;
+            dag[scc].push_back(v);
+            if (v == u) break;
+        }
+    }
+}
+
+int main() {
+    return 0;
+}

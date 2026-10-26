@@ -54,6 +54,10 @@ int query(int u, int v) {
     return ancestor[u][0];
 }
 
+int dist(int u, int v) {
+    return depth[u] + depth[v] - 2 * depth[query(u, v)];
+}
+
 int main() {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);

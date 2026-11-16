@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+#
+# ./run                     编译最近修改过的源文件并运行
+# ./run p3384               编译 sources/p33/84.cpp 并运行
+# ./run sources/p33/84.cpp  直接指定源文件
+#
+# 编译产物固定输出到 outputs/out，编译成功后立即运行，标准输入/输出都接到终端：
+#   ./run p1001 < 1.in      用文件喂数据
+#   ./run p1001 3 4         多余参数会作为 argv 传给程序
+#
+# 可用环境变量: CXX (默认 g++)、STD (默认 c++17)、FLAGS (默认 -O2 -g -Wall)
+
+set -euo pipefail
+
+CXX="${CXX:-g++}"
+STD="${STD:-c++17}"
+FLAGS="${FLAGS:--O2 -g -Wall}"
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+OUT_DIR="${ROOT}/outputs"
+OUT="${OUT_DIR}/out"
+
+usage() {
+    echo "用法: ${0##*/} [题目编号 | 源文件] [程序参数...]" >&2
+    echo "  ${0##*/} p3384                -> 编译 sources/p33/84.cpp" >&2
+    echo "  ${0##*/} sources/p33/84.cpp   -> 直接指定源文件" >&2
+    echo "  ${0##*/}                      -> 编译最近修改过的源文件" >&2
+    exit 1
+}
+
+die() {
+    echo "错误: $*" >&2
+    exit 1
+}
+
+# 题号 -> 源文件路径（与 ./setup 的命名规则一致：去掉末位做目录，末两位做文件名）
+problem_path() {
+    local pid="$1" num="${1:1}" name prefix
+    printf -v name '%02d' "$((10#$num % 100))"
+    prefix="${pid:0:${#num}-1}"
+    prefix="${prefix,,}"
+    echo "${ROOT}/sources/${prefix}/${name}.cpp"
+}
+
+# ---- 定位源文件 ----
+src=""
+if [ $# -ge 1 ]; then
+    arg="$1"
+    case "$arg" in
+        [pP][0-9]*)
+            candidate="$(problem_path "${arg^^}")"
+            [ -f "$candidate" ] || die "源文件不存在: ${candidate#"${ROOT}/"}（先用 ./setup ${arg} 拉题）"
+            src="$candidate"
+            shift
+            ;;
+        *.cpp)
+            if [ -f "$arg" ]; then
+                src="$(cd -- "$(dirname -- "$arg")" && pwd)/$(basename -- "$arg")"
+            elif [ -f "${ROOT}/${arg}" ]; then
+                src="${ROOT}/${arg}"
+            else
+                die "源文件不存在: ${arg}"
+            fi
+            shift
+            ;;
+        *)
+            usage
+            ;;
+    esac
+fi
+
+if [ -z "$src" ]; then
+    # 没指定就找最近修改过的 .cpp
+    src="$(find "${ROOT}/sources" "${ROOT}/模板" -name '*.cpp' -type f -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -n1 | cut -d' ' -f2- || true)"
+    [ -n "$src" ] || die "没找到任何 .cpp 源文件"
+    echo "未指定源文件，使用最近修改的: ${src#"${ROOT}/"}" >&2
+fi
+
+# ---- 编译 ----
+mkdir -p "$OUT_DIR"
+
+echo "编译 ${src#"${ROOT}/"} -> ${OUT#"${ROOT}/"} ..." >&2
+if ! "$CXX" "-std=${STD}" $FLAGS "$src" -o "$OUT"; then
+    echo "编译失败，不运行。" >&2
+    exit 1
+fi
+
+# ---- 运行 ----
+echo "运行 ${OUT#"${ROOT}/"} ..." >&2
+exec "$OUT" "$@"

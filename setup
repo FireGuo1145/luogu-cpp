@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#
+# ./setup p3384   或   ./setup P3384
+#
+# 从洛谷拉取题目，生成 sources/p33/84.cpp（文件名只保留标号的后两位）。
+# 若文件已存在则不会覆盖。
+
+set -euo pipefail
+
+AUTHOR="FireGuo"
+
+usage() {
+    echo "用法: ${0##*/} <题目编号>" >&2
+    echo "  例: ${0##*/} p3384" >&2
+    echo "      ${0##*/} P1001" >&2
+    exit 1
+}
+
+die() {
+    echo "错误: $*" >&2
+    exit 1
+}
+
+[ $# -eq 1 ] || usage
+
+# ---- 解析输入：pXXXX / PXXXX / 纯数字 ----
+input="$1"
+case "$input" in
+    [pP][0-9]*)  pid="${input^^}" ;;   # p3384 -> P3384
+    [0-9]*)      pid="P${input}"  ;;   # 3384  -> P3384
+    *)           usage ;;
+esac
+
+[[ "$pid" =~ ^P[0-9]+$ ]] || die "题目编号格式不正确: $input"
+
+num="${pid:1}"                        # 3384
+printf -v name '%02d' "$((10#$num % 100))"   # 后两位 -> 84
+prefix="${pid:0:${#num}-1}"           # 去掉最后一位 -> p33 / p338 / p3384
+prefix="${prefix,,}"                  # 仓库里目录都是小写，统一转小写
+
+# ---- 下载题目页，取标题 ----
+UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+url="https://www.luogu.com.cn/problem/${pid}"
+tmp="$(mktemp)"
+cookies="$(mktemp)"
+trap 'rm -f "$tmp" "$cookies"' EXIT
+
+echo "正在拉取 ${pid} ..." >&2
+if command -v curl >/dev/null 2>&1; then
+    # 洛谷靠 cookie 做一次跳转，必须带 cookie jar，否则会 302 死循环
+    curl -sSL -m 20 -A "$UA" -c "$cookies" -b "$cookies" "$url" -o "$tmp" \
+        || die "下载失败: $url"
+elif command -v wget >/dev/null 2>&1; then
+    wget -q -T 20 --max-redirect=20 --keep-session-cookies \
+        --save-cookies "$cookies" --load-cookies "$cookies" \
+        -U "$UA" -O "$tmp" "$url" || die "下载失败: $url"
+else
+    die "需要 curl 或 wget"
+fi
+
+# og:title 优先，其次 <title>，再去掉结尾的 " - 洛谷"
+title="$(grep -o 'property="og:title" content="[^"]*"' "$tmp" 2>/dev/null | head -n1 | sed 's/.*content="//; s/"$//' || true)"
+if [ -z "$title" ]; then
+    title="$(grep -o '<title>[^<]*</title>' "$tmp" 2>/dev/null | head -n1 | sed 's/<title>//; s|</title>||' || true)"
+fi
+title="${title% - 洛谷}"
+title="${title%"${title##*[![:space:]]}"}"   # 去掉尾部空白
+
+case "$title" in
+    ""|Welcome*|Luogu*) die "没有找到题目 ${pid} 的标题（题目不存在？）" ;;
+esac
+[[ "$title" == "$pid"* ]] || title="${pid} ${title}"
+
+# ---- 生成文件 ----
+dir="sources/${prefix}"
+file="${dir}/${name}.cpp"
+
+if [ -e "$file" ]; then
+    die "文件已存在: ${file}"
+fi
+
+mkdir -p "$dir"
+[ -e "$dir" ] || die "无法创建目录: ${dir}"
+
+cat > "$file" <<EOF
+// @Title: ${title}
+// @Link: ${url}
+// @Author: ${AUTHOR}
+// @Time: $(date '+%Y-%m-%d %H:%M')
+
+#include <bits/stdc++.h>
+
+int main() {
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(nullptr);
+
+    return 0;
+}
+EOF
+
+echo "已生成: ${file}"
+echo "标题:   ${title}"
